@@ -1,0 +1,21 @@
+{
+  "name": "demo-ppi",
+  "version": "0.1.0",
+  "description": "Progressive Professional Identity (Demo) — 拿来主义：从 kung-fu / Iamgeek / PPI 文档中摘取有用片段与战略理念",
+  "main": "src/consensus.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "keywords": [
+    "PPI",
+    "progressive-professional-identity",
+    "consensus",
+    "nextjs",
+    "supabase"
+  ],
+  "author": "Peter (szpeter2026)",
+  "license": "MIT",
+  "dependencies": {
+    "@supabase/supabase-js": "^2.39.0"
+  }
+}
