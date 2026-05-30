@@ -122,9 +122,9 @@ function SignUpFormInner({
                 <Label htmlFor="invite-code">邀请码 *</Label>
                 <Input
                   id="invite-code"
-                  placeholder="8位邀请码，如 A1B2C3D4"
+                  placeholder="输入邀请码，如 A1B2C3D4"
                   required
-                  maxLength={8}
+                  maxLength={20}
                   value={inviteCode}
                   onChange={(e) => setInviteCode(e.target.value.toUpperCase())}
                   className={cn(
