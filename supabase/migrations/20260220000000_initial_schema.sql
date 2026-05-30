@@ -1,0 +1,234 @@
+-- Consensus Network - Initial Database Schema
+-- Phase 1 MVP: profiles, connections, tag libraries
+-- Run this in Supabase SQL Editor: https://app.supabase.com/project/_/sql/new
+
+-- ============================================
+-- 1. PROFILES 表（扩展 auth.users）
+-- 存储 Layer 0/1/2 数据，关联 auth.users(id)
+-- ============================================
+create table public.profiles (
+  id uuid primary key references auth.users(id) on delete cascade,
+  username text unique,
+  -- Layer 0: 公开人格
+  layer0 jsonb default '{}',
+  -- Layer 1: 兴趣图谱（建立连接后可见）
+  layer1 jsonb default '{}',
+  -- Layer 2: 深度档案（Phase 2）
+  layer2 jsonb default '{}',
+  -- 可见性设置
+  visibility_settings jsonb default '{"default_layer": 0, "layer_1_rule": "connected", "show_in_discover": true}',
+  created_at timestamptz default now() not null,
+  updated_at timestamptz default now() not null
+);
+
+-- Layer 0 JSON 结构示例:
+-- {
+--   "name": "Alice Chen",
+--   "avatar": "https://...",
+--   "manifesto": "用技术连接孤岛",
+--   "value_tags": ["开源", "隐私优先"],
+--   "interest_tags": ["Web3", "设计"],
+--   "city": "深圳"
+-- }
+
+-- RLS: 用户只能读写自己的 profile
+alter table public.profiles enable row level security;
+
+create policy "Users can view all profiles"
+  on public.profiles for select
+  using (true);
+
+create policy "Users can insert own profile"
+  on public.profiles for insert
+  with check (auth.uid() = id);
+
+create policy "Users can update own profile"
+  on public.profiles for update
+  using (auth.uid() = id);
+
+-- 新用户注册时自动创建 profile
+create or replace function public.handle_new_user()
+returns trigger as $$
+begin
+  insert into public.profiles (id, username)
+  values (
+    new.id,
+    coalesce(new.raw_user_meta_data->>'username', split_part(new.email, '@', 1))
+  );
+  return new;
+end;
+$$ language plpgsql security definer;
+
+create trigger on_auth_user_created
+  after insert on auth.users
+  for each row execute procedure public.handle_new_user();
+
+-- ============================================
+-- 2. CONNECTIONS 表（关注/连接关系）
+-- ============================================
+create table public.connections (
+  id bigint primary key generated always as identity,
+  follower_id uuid not null references auth.users(id) on delete cascade,
+  following_id uuid not null references auth.users(id) on delete cascade,
+  created_at timestamptz default now() not null,
+  unique(follower_id, following_id),
+  check (follower_id != following_id)
+);
+
+create index idx_connections_follower on public.connections(follower_id);
+create index idx_connections_following on public.connections(following_id);
+
+alter table public.connections enable row level security;
+
+create policy "Users can view connections"
+  on public.connections for select
+  using (true);
+
+create policy "Users can create own connections"
+  on public.connections for insert
+  with check (auth.uid() = follower_id);
+
+create policy "Users can delete own connections"
+  on public.connections for delete
+  using (auth.uid() = follower_id);
+
+-- ============================================
+-- 3. 价值观标签库
+-- ============================================
+create table public.value_tags (
+  id text primary key,
+  label text not null,
+  sort_order int default 0
+);
+
+-- 初始 50 个价值观标签
+insert into public.value_tags (id, label, sort_order) values
+  ('open_source', '开源', 1),
+  ('privacy_first', '隐私优先', 2),
+  ('decentralization', '去中心化', 3),
+  ('innovation', '创新', 4),
+  ('collaboration', '协作', 5),
+  ('lifelong_learning', '终身学习', 6),
+  ('authenticity', '真实', 7),
+  ('sustainability', '可持续发展', 8),
+  ('user_experience', '用户体验', 9),
+  ('transparency', '透明', 10),
+  ('community', '社区', 11),
+  ('creativity', '创造力', 12),
+  ('independence', '独立', 13),
+  ('quality', '质量', 14),
+  ('simplicity', '简洁', 15),
+  ('diversity', '多元', 16),
+  ('inclusion', '包容', 17),
+  ('growth_mindset', '成长型思维', 18),
+  ('impact', '影响力', 19),
+  ('ownership', '主人翁精神', 20),
+  ('experimentation', '实验精神', 21),
+  ('feedback', '反馈驱动', 22),
+  ('remote_first', '远程优先', 23),
+  ('async', '异步协作', 24),
+  ('knowledge_sharing', '知识共享', 25),
+  ('mentorship', '导师精神', 26),
+  ('balance', '工作生活平衡', 27),
+  ('minimalism', '极简主义', 28),
+  ('systematic', '系统化思考', 29),
+  ('data_driven', '数据驱动', 30),
+  ('human_centric', '以人为本', 31),
+  ('anti_growth_hacking', '反增长黑客', 32),
+  ('slow_is_fast', '慢即是快', 33),
+  ('trust', '信任', 34),
+  ('integrity', '正直', 35),
+  ('curiosity', '好奇心', 36),
+  ('empathy', '同理心', 37),
+  ('resilience', '韧性', 38),
+  ('adaptability', '适应力', 39),
+  ('critical_thinking', '批判性思维', 40),
+  ('first_principles', '第一性原理', 41),
+  ('long_term', '长期主义', 42),
+  ('anti_speculation', '反投机', 43),
+  ('builder', '建设者', 44),
+  ('explorer', '探索者', 45),
+  ('connector', '连接者', 46),
+  ('creator', '创造者', 47),
+  ('thinker', '思考者', 48),
+  ('doer', '行动派', 49),
+  ('learner', '学习者', 50);
+
+alter table public.value_tags enable row level security;
+create policy "Value tags are publicly readable"
+  on public.value_tags for select using (true);
+
+-- ============================================
+-- 4. 兴趣标签库
+-- ============================================
+create table public.interest_tags (
+  id text primary key,
+  label text not null,
+  category text,
+  sort_order int default 0
+);
+
+insert into public.interest_tags (id, label, category, sort_order) values
+  ('web3', 'Web3', 'tech', 1),
+  ('product_design', '产品设计', 'design', 2),
+  ('writing', '写作', 'creative', 3),
+  ('philosophy', '哲学', 'thinking', 4),
+  ('psychology', '心理学', 'human', 5),
+  ('ai', 'AI', 'tech', 6),
+  ('blockchain', '区块链', 'tech', 7),
+  ('ux_design', 'UX设计', 'design', 8),
+  ('open_source', '开源', 'tech', 9),
+  ('community', '社区运营', 'social', 10),
+  ('startup', '创业', 'business', 11),
+  ('investing', '投资', 'finance', 12),
+  ('research', '研究', 'academic', 13),
+  ('education', '教育', 'social', 14),
+  ('content_creation', '内容创作', 'creative', 15),
+  ('podcast', '播客', 'media', 16),
+  ('video', '视频', 'media', 17),
+  ('music', '音乐', 'creative', 18),
+  ('art', '艺术', 'creative', 19),
+  ('reading', '阅读', 'learning', 20),
+  ('meditation', '冥想', 'wellness', 21),
+  ('fitness', '健身', 'wellness', 22),
+  ('travel', '旅行', 'lifestyle', 23),
+  ('cooking', '烹饪', 'lifestyle', 24),
+  ('photography', '摄影', 'creative', 25),
+  ('coding', '编程', 'tech', 26),
+  ('devops', 'DevOps', 'tech', 27),
+  ('data_science', '数据科学', 'tech', 28),
+  ('design_systems', '设计系统', 'design', 29),
+  ('accessibility', '无障碍设计', 'design', 30),
+  ('dao', 'DAO', 'web3', 31),
+  ('defi', 'DeFi', 'web3', 32),
+  ('nft', 'NFT', 'web3', 33),
+  ('identity', '去中心化身份', 'web3', 34),
+  ('governance', '治理', 'web3', 35),
+  ('social_impact', '社会影响', 'social', 36),
+  ('sustainability', '可持续', 'social', 37),
+  ('mental_health', '心理健康', 'wellness', 38),
+  ('productivity', '效率', 'work', 39),
+  ('remote_work', '远程工作', 'work', 40),
+  ('management', '管理', 'business', 41),
+  ('marketing', '营销', 'business', 42),
+  ('sales', '销售', 'business', 43),
+  ('legal', '法律', 'professional', 44),
+  ('finance', '金融', 'finance', 45),
+  ('crypto', '加密货币', 'web3', 46),
+  ('gaming', '游戏', 'entertainment', 47),
+  ('film', '电影', 'entertainment', 48),
+  ('literature', '文学', 'creative', 49),
+  ('history', '历史', 'academic', 50);
+
+alter table public.interest_tags enable row level security;
+create policy "Interest tags are publicly readable"
+  on public.interest_tags for select using (true);
+
+-- ============================================
+-- 5. Storage bucket for avatars
+-- 在 Supabase Dashboard > Storage 中手动创建 'avatars' bucket (public)
+-- 或取消下方注释执行
+-- ============================================
+-- insert into storage.buckets (id, name, public)
+-- values ('avatars', 'avatars', true)
+-- on conflict (id) do nothing;
