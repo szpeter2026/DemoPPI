@@ -71,6 +71,14 @@ export function Step5Preview({ data }: Step5PreviewProps) {
               </span>
             ))}
           </div>
+          {data.mbti_type && (
+            <div className="flex items-center gap-1.5 pt-1">
+              <span className="inline-flex items-center rounded-md bg-violet-100 dark:bg-violet-900/40 px-2 py-0.5 text-xs font-semibold text-violet-700 dark:text-violet-300">
+                {data.mbti_type}
+              </span>
+              <span className="text-xs text-muted-foreground">人格类型</span>
+            </div>
+          )}
         </div>
       </div>
     </div>

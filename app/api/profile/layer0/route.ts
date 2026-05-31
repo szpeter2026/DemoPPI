@@ -2,6 +2,13 @@ import { createClient } from "@/lib/supabase/server";
 import { NextResponse } from "next/server";
 import { z } from "zod";
 
+const MBTI_TYPES = [
+  "INTJ","INTP","ENTJ","ENTP",
+  "INFJ","INFP","ENFJ","ENFP",
+  "ISTJ","ISFJ","ESTJ","ESFJ",
+  "ISTP","ISFP","ESTP","ESFP",
+] as const;
+
 const Layer0Schema = z.object({
   name: z.string().min(1).max(50),
   avatar: z.string().url().optional().or(z.literal("")),
@@ -9,6 +16,7 @@ const Layer0Schema = z.object({
   value_tags: z.array(z.string()).min(3).max(5),
   interest_tags: z.array(z.string()).min(3).max(5),
   city: z.string().max(50).optional(),
+  mbti_type: z.enum(MBTI_TYPES).optional(), // 可选，跳过时不传
 });
 
 export async function POST(request: Request) {

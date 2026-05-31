@@ -11,6 +11,7 @@ import { Step1BasicInfo } from "./step1-basic-info";
 import { Step2Manifesto } from "./step2-manifesto";
 import { Step3ValueTags } from "./step3-value-tags";
 import { Step4InterestTags } from "./step4-interest-tags";
+import { StepMbti } from "./step-mbti";
 import { Step5Preview } from "./step5-preview";
 import { ChevronLeft, ChevronRight } from "lucide-react";
 
@@ -19,7 +20,8 @@ const STEPS = [
   { id: 2, title: "个人宣言", desc: "20-50字核心理念" },
   { id: 3, title: "价值观", desc: "选择3-5个" },
   { id: 4, title: "兴趣", desc: "选择3-5个" },
-  { id: 5, title: "预览", desc: "确认你的名片" },
+  { id: 5, title: "人格类型", desc: "MBTI（可选）" },
+  { id: 6, title: "预览", desc: "确认你的名片" },
 ];
 
 interface OnboardingWizardProps {
@@ -37,6 +39,7 @@ export function OnboardingWizard({ userId, initialData }: OnboardingWizardProps)
     value_tags: initialData.value_tags ?? [],
     interest_tags: initialData.interest_tags ?? [],
     city: initialData.city ?? "",
+    mbti_type: initialData.mbti_type ?? "",
   });
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -62,6 +65,8 @@ export function OnboardingWizard({ userId, initialData }: OnboardingWizardProps)
         return data.value_tags.length >= 3 && data.value_tags.length <= 5;
       case 4:
         return data.interest_tags.length >= 3 && data.interest_tags.length <= 5;
+      case 5:
+        return true; // MBTI 可选，始终可继续
       default:
         return true;
     }
@@ -69,7 +74,7 @@ export function OnboardingWizard({ userId, initialData }: OnboardingWizardProps)
 
   const handleNext = () => {
     saveDraft();
-    if (step < 5) setStep(step + 1);
+    if (step < 6) setStep(step + 1);
   };
 
   const handleBack = () => {
@@ -90,6 +95,7 @@ export function OnboardingWizard({ userId, initialData }: OnboardingWizardProps)
           value_tags: data.value_tags,
           interest_tags: data.interest_tags,
           city: data.city.trim() || undefined,
+          mbti_type: data.mbti_type || undefined,
         }),
       });
       const json = await res.json();
@@ -100,7 +106,7 @@ export function OnboardingWizard({ userId, initialData }: OnboardingWizardProps)
       if (typeof window !== "undefined") {
         localStorage.removeItem(LAYER0_STORAGE_KEY);
       }
-      router.replace("/protected");
+      router.replace("/onboarding/success");
     } catch (e) {
       setError(e instanceof Error ? e.message : "保存失败");
     } finally {
@@ -154,6 +160,9 @@ export function OnboardingWizard({ userId, initialData }: OnboardingWizardProps)
             <Step4InterestTags data={data} onChange={updateData} />
           )}
           {step === 5 && (
+            <StepMbti data={data} onChange={updateData} />
+          )}
+          {step === 6 && (
             <Step5Preview data={data} />
           )}
 
@@ -170,12 +179,12 @@ export function OnboardingWizard({ userId, initialData }: OnboardingWizardProps)
               <ChevronLeft className="w-4 h-4 mr-1" />
               上一步
             </Button>
-            {step < 5 ? (
+            {step < 6 ? (
               <Button
                 onClick={handleNext}
                 disabled={!canProceed()}
               >
-                下一步
+                {step === 5 ? (data.mbti_type ? "下一步" : "跳过") : "下一步"}
                 <ChevronRight className="w-4 h-4 ml-1" />
               </Button>
             ) : (

@@ -25,6 +25,7 @@ function SignUpFormInner({
   const [repeatPassword, setRepeatPassword] = useState("");
   const [inviteCode, setInviteCode] = useState("");
   const [inviteValid, setInviteValid] = useState<boolean | null>(null);
+  const [isSeedCode, setIsSeedCode] = useState(false); // ★ 是否是种子码
   const [error, setError] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(false);
   const router = useRouter();
@@ -43,14 +44,29 @@ function SignUpFormInner({
     const code = inviteCode.trim();
     if (code.length < 4) {
       setInviteValid(null);
+      setIsSeedCode(false);
+      return;
+    }
+
+    // ★ 前端也能识别种子码（NEXT_PUBLIC_ 前缀暴露给客户端）
+    const seedCode = process.env.NEXT_PUBLIC_SEED_INVITE_CODE?.trim().toUpperCase();
+    if (seedCode && code.toUpperCase() === seedCode) {
+      setInviteValid(true);
+      setIsSeedCode(true);
       return;
     }
 
     const timer = setTimeout(() => {
-      fetch(`/api/invites/validate?code=${encodeURIComponent(code.toUpperCase())}`)
+      fetch(`/api/invites/validate?code=${encodeURIComponent(code)}`)
         .then((r) => r.json())
-        .then((data) => setInviteValid(data.valid))
-        .catch(() => setInviteValid(false));
+        .then((data) => {
+          setInviteValid(data.valid);
+          setIsSeedCode(!!data.is_seed);
+        })
+        .catch(() => {
+          setInviteValid(false);
+          setIsSeedCode(false);
+        });
     }, 300);
 
     return () => clearTimeout(timer);
@@ -93,10 +109,19 @@ function SignUpFormInner({
       });
       if (error) throw error;
 
-      // Consume the invite code after successful signup
-      // This runs client-side, so we need the user ID from the signup
-      // The actual consumption should also happen server-side via trigger or RPC
-      // For MVP, we'll rely on the server-side trigger approach
+      // 注册成功后消费邀请码
+      const userId = data?.user?.id;
+      if (userId) {
+        const inviteCodeToConsume = inviteCode.trim().toUpperCase();
+        // 种子码不需要消费（数据库里没有记录）
+        const seedCode = process.env.NEXT_PUBLIC_SEED_INVITE_CODE?.trim().toUpperCase();
+        if (!seedCode || inviteCodeToConsume !== seedCode) {
+          await supabase.rpc("consume_invite", {
+            p_code: inviteCodeToConsume,
+            p_user_id: userId,
+          });
+        }
+      }
 
       router.push("/auth/sign-up-success");
     } catch (error: unknown) {

@@ -1,0 +1,100 @@
+<!--
+  DemoPPI 小程序 — 登录页
+  两步流程：1) 验证邀请码 2) 微信一键登录
+-->
+<view class="login-page">
+  <!-- 顶部品牌区 -->
+  <view class="brand-section">
+    <view class="brand-logo">D</view>
+    <view class="brand-name">DemoPPI</view>
+    <view class="brand-slogan">找到你的共识圈</view>
+  </view>
+
+  <!-- Step 1: 输入邀请码 -->
+  <view class="form-section" wx:if="{{step === 1}}">
+    <view class="section-title">邀请码</view>
+    <view class="section-desc">
+      DemoPPI 是邀请制社区，请输入邀请码加入
+    </view>
+
+    <van-field
+      value="{{inviteCode}}"
+      placeholder="请输入邀请码"
+      border="{{true}}"
+      custom-style="font-size: 32rpx; text-transform: uppercase; letter-spacing: 4rpx;"
+      center="{{true}}"
+      bind:input="onInviteCodeInput"
+      maxlength="20"
+    />
+
+    <view class="error-msg" wx:if="{{errorMsg}}">
+      <van-icon name="warning-o" size="28rpx" color="#ee0a24" />
+      <text>{{errorMsg}}</text>
+    </view>
+
+    <van-button
+      type="primary"
+      block="{{true}}"
+      round="{{true}}"
+      custom-class="submit-btn"
+      custom-style="background-color: #6366f1; border-color: #6366f1;"
+      loading="{{loading}}"
+      disabled="{{!inviteCode}}"
+      bind:click="onValidateInviteCode"
+    >
+      验证邀请码
+    </van-button>
+
+    <view class="tip-text">
+      还没有邀请码？找已在社区的朋友要一个吧
+    </view>
+  </view>
+
+  <!-- Step 2: 微信一键登录 -->
+  <view class="form-section" wx:if="{{step === 2}}">
+    <view class="section-title">微信登录</view>
+    <view class="section-desc">
+      邀请码验证通过！使用微信快速登录
+    </view>
+
+    <view class="invite-code-display">
+      <van-tag type="success" size="large" round>
+        邀请码 {{inviteCode}} ✓
+      </van-tag>
+    </view>
+
+    <van-button
+      type="primary"
+      block="{{true}}"
+      round="{{true}}"
+      custom-class="submit-btn wechat-btn"
+      custom-style="background-color: #07c160; border-color: #07c160;"
+      loading="{{loading}}"
+      icon="https://mmbiz.qpic.cn/mmbiz_png/.../0?wx_fmt=png"
+      bind:click="onWechatLogin"
+    >
+      微信一键登录
+    </van-button>
+
+    <view class="error-msg" wx:if="{{errorMsg}}">
+      <van-icon name="warning-o" size="28rpx" color="#ee0a24" />
+      <text>{{errorMsg}}</text>
+    </view>
+
+    <view class="back-link" bind:tap="onGoBack">
+      返回修改邀请码
+    </view>
+  </view>
+
+  <!-- 底部协议 -->
+  <view class="agreement-section">
+    <text class="agreement-text">
+      登录即代表同意
+      <text class="agreement-link">《用户协议》</text>
+      和
+      <text class="agreement-link">《隐私政策》</text>
+    </text>
+  </view>
+</view>
+
+<van-toast id="van-toast" />

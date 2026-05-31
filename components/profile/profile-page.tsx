@@ -3,16 +3,11 @@
 import { useEffect, useState } from "react";
 import { Card, CardContent, CardHeader } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import {
-  Popover,
-  PopoverContent,
-  PopoverTrigger,
-} from "@/components/ui/popover";
 import { ConsensusDetail } from "@/components/consensus/consensus-detail";
 import { FollowButton } from "@/components/follow-button";
-import { User, Share2, Copy, Check } from "lucide-react";
+import { ShareCard } from "@/components/share/share-card";
+import { User } from "lucide-react";
 import Link from "next/link";
-import { QRCodeSVG } from "qrcode.react";
 
 interface ProfilePageProps {
   profile: {
@@ -35,7 +30,6 @@ export function ProfilePage({ profile, currentUserId }: ProfilePageProps) {
   } | null>(null);
   const [valueLabels, setValueLabels] = useState<Record<string, string>>({});
   const [interestLabels, setInterestLabels] = useState<Record<string, string>>({});
-  const [copied, setCopied] = useState(false);
   const [isFollowing, setIsFollowing] = useState(false);
   const [connectionLoaded, setConnectionLoaded] = useState(false);
 
@@ -86,17 +80,7 @@ export function ProfilePage({ profile, currentUserId }: ProfilePageProps) {
     });
   }, []);
 
-  const shareUrl =
-    typeof window !== "undefined"
-      ? `${window.location.origin}/p/${profile.username ?? profile.id}`
-      : "";
-
-  const handleCopyLink = async () => {
-    if (typeof window === "undefined") return;
-    await navigator.clipboard.writeText(shareUrl);
-    setCopied(true);
-    setTimeout(() => setCopied(false), 2000);
-  };
+  const mbtiType = layer0.mbti_type as string;
 
   return (
     <div className="max-w-2xl mx-auto space-y-8">
@@ -138,42 +122,17 @@ export function ProfilePage({ profile, currentUserId }: ProfilePageProps) {
                     }
                   />
                 )}
-                <Popover>
-                  <PopoverTrigger asChild>
-                    <Button variant="outline" size="sm" className="gap-2">
-                      <Share2 className="w-4 h-4" />
-                      分享名片
-                    </Button>
-                  </PopoverTrigger>
-                  <PopoverContent className="w-72" align="center">
-                    <div className="space-y-4">
-                      <p className="text-sm font-medium">分享我的名片</p>
-                      {shareUrl && (
-                        <div className="flex justify-center rounded-lg bg-muted p-4">
-                          <QRCodeSVG value={shareUrl} size={160} level="M" />
-                        </div>
-                      )}
-                      <Button
-                        variant="secondary"
-                        size="sm"
-                        className="w-full gap-2"
-                        onClick={handleCopyLink}
-                      >
-                        {copied ? (
-                          <>
-                            <Check className="w-4 h-4" />
-                            已复制链接
-                          </>
-                        ) : (
-                          <>
-                            <Copy className="w-4 h-4" />
-                            复制链接
-                          </>
-                        )}
-                      </Button>
-                    </div>
-                  </PopoverContent>
-                </Popover>
+                <ShareCard
+                  username={profile.username ?? profile.id}
+                  name={name}
+                  mbtiType={mbtiType}
+                  city={city}
+                  manifesto={manifesto}
+                  valueTags={valueTags}
+                  interestTags={interestTags}
+                  valueLabels={valueLabels}
+                  interestLabels={interestLabels}
+                />
               </div>
             )}
           </div>

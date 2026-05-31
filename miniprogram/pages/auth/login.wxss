@@ -1,0 +1,130 @@
+/* 登录页样式 */
+.login-page {
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding: 0 60rpx;
+  background: linear-gradient(180deg, #f8f7ff 0%, #ffffff 50%, #f5f5f5 100%);
+}
+
+/* 品牌区 */
+.brand-section {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  margin-top: 180rpx;
+  margin-bottom: 80rpx;
+}
+
+.brand-logo {
+  width: 120rpx;
+  height: 120rpx;
+  border-radius: 28rpx;
+  background: linear-gradient(135deg, #6366f1, #8b5cf6);
+  color: #ffffff;
+  font-size: 64rpx;
+  font-weight: 700;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin-bottom: 24rpx;
+  box-shadow: 0 8rpx 32rpx rgba(99, 102, 241, 0.3);
+}
+
+.brand-name {
+  font-size: 40rpx;
+  font-weight: 700;
+  color: #18191c;
+  margin-bottom: 8rpx;
+}
+
+.brand-slogan {
+  font-size: 28rpx;
+  color: #8b8fa3;
+}
+
+/* 表单区 */
+.form-section {
+  width: 100%;
+  display: flex;
+  flex-direction: column;
+}
+
+.section-title {
+  font-size: 36rpx;
+  font-weight: 600;
+  color: #18191c;
+  margin-bottom: 8rpx;
+}
+
+.section-desc {
+  font-size: 26rpx;
+  color: #8b8fa3;
+  margin-bottom: 40rpx;
+}
+
+/* 邀请码展示 */
+.invite-code-display {
+  display: flex;
+  justify-content: center;
+  margin-bottom: 48rpx;
+}
+
+/* 提交按钮 */
+.submit-btn {
+  margin-top: 40rpx !important;
+}
+
+.wechat-btn {
+  height: 96rpx !important;
+  font-size: 32rpx !important;
+}
+
+/* 错误信息 */
+.error-msg {
+  display: flex;
+  align-items: center;
+  gap: 8rpx;
+  margin-top: 16rpx;
+  font-size: 24rpx;
+  color: #ee0a24;
+}
+
+/* 提示文字 */
+.tip-text {
+  text-align: center;
+  font-size: 24rpx;
+  color: #c0c4cc;
+  margin-top: 32rpx;
+}
+
+/* 返回链接 */
+.back-link {
+  text-align: center;
+  font-size: 26rpx;
+  color: #6366f1;
+  margin-top: 24rpx;
+  padding: 16rpx;
+}
+
+/* 协议区 */
+.agreement-section {
+  position: fixed;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  padding: 24rpx 60rpx;
+  padding-bottom: calc(24rpx + env(safe-area-inset-bottom));
+  text-align: center;
+  background-color: #ffffff;
+}
+
+.agreement-text {
+  font-size: 22rpx;
+  color: #c0c4cc;
+}
+
+.agreement-link {
+  color: #6366f1;
+}

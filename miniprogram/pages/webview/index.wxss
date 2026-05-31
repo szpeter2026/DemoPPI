@@ -1,0 +1,5 @@
+/* web-view 主页样式 — 全屏展示 */
+page {
+  height: 100%;
+  overflow: hidden;
+}

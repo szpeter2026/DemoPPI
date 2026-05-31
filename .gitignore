@@ -33,3 +33,9 @@ next-env.d.ts
 # OS
 .DS_Store
 Thumbs.db
+
+# Miniprogram export archives (large binaries)
+miniprogram-export/
+
+# Lock file (generated)
+package-lock.json

@@ -12,7 +12,7 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { ProfileCard } from "@/components/profile/profile-card";
 import { FollowButton } from "@/components/follow-button";
-import { Search, Filter, ChevronDown } from "lucide-react";
+import { Search, Filter, ChevronDown, Shield, Scale, ArrowRight } from "lucide-react";
 import Link from "next/link";
 
 interface DiscoverUser {
@@ -37,6 +37,37 @@ interface DiscoverPageProps {
   userId: string;
 }
 
+/** 社区自治引导横幅：核心差异化是治理权，不是配额 */
+function GovernanceBanner() {
+  return (
+    <div className="rounded-lg border border-primary/20 bg-gradient-to-r from-primary/5 to-primary/10 p-4 flex flex-col sm:flex-row items-start sm:items-center gap-3">
+      <div className="flex items-center gap-2 text-primary">
+        <Scale className="w-5 h-5" />
+        <span className="font-medium">参与社区治理</span>
+      </div>
+      <p className="text-sm text-muted-foreground flex-1">
+        升级到治理者身份，发起提案、参与投票，用你的声音塑造社区的未来
+      </p>
+      <Link href="/pricing">
+        <Button size="sm" variant="outline" className="gap-1">
+          了解治理权限
+          <ArrowRight className="w-4 h-4" />
+        </Button>
+      </Link>
+    </div>
+  );
+}
+
+/** 防刷提示（仅在真正触发防刷时显示，不主动展示） */
+function AntiAbuseNotice() {
+  return (
+    <div className="rounded-lg border border-muted bg-muted/30 p-3 flex items-center gap-2 text-sm text-muted-foreground">
+      <Shield className="w-4 h-4" />
+      <span>操作过于频繁，请稍后再试（防刷保护）</span>
+    </div>
+  );
+}
+
 export function DiscoverPage({ userId }: DiscoverPageProps) {
   const [users, setUsers] = useState<DiscoverUser[]>([]);
   const [loading, setLoading] = useState(true);
@@ -47,13 +78,14 @@ export function DiscoverPage({ userId }: DiscoverPageProps) {
   const [minConsensus, setMinConsensus] = useState(0);
   const [valueLabels, setValueLabels] = useState<Record<string, string>>({});
   const [interestLabels, setInterestLabels] = useState<Record<string, string>>({});
-  const [valueTags, setValueTags] = useState<{ id: string; label: string }[]>(
-    []
-  );
+  const [valueTags, setValueTags] = useState<{ id: string; label: string }[]>([]);
   const [interestTags, setInterestTags] = useState<
     { id: string; label: string }[]
   >([]);
   const [followedUsers, setFollowedUsers] = useState<Set<string>>(new Set());
+
+  // 防刷状态（仅当真正触发时显示）
+  const [antiAbuseTriggered, setAntiAbuseTriggered] = useState(false);
 
   useEffect(() => {
     const t = setTimeout(() => setSearchDebounced(search), 300);
@@ -70,7 +102,13 @@ export function DiscoverPage({ userId }: DiscoverPageProps) {
     params.set("limit", "50");
 
     fetch(`/api/discover?${params}`)
-      .then((r) => r.json())
+      .then((r) => {
+        if (r.status === 429) {
+          setAntiAbuseTriggered(true);
+          return [];
+        }
+        return r.json();
+      })
       .then(setUsers)
       .catch(() => setUsers([]))
       .finally(() => setLoading(false));
@@ -78,7 +116,7 @@ export function DiscoverPage({ userId }: DiscoverPageProps) {
 
   useEffect(() => {
     fetchUsers();
-  }, [fetchUsers]);
+  }, [fetchUsers]); // eslint-disable-line react-hooks/exhaustive-deps
 
   useEffect(() => {
     Promise.all([
@@ -130,12 +168,20 @@ export function DiscoverPage({ userId }: DiscoverPageProps) {
 
   return (
     <div className="space-y-6">
-      <div>
-        <h1 className="text-2xl font-bold">发现同道</h1>
-        <p className="text-muted-foreground mt-1">
-          基于价值观与兴趣共识，探索志同道合的人
-        </p>
+      <div className="flex items-center justify-between">
+        <div>
+          <h1 className="text-2xl font-bold">发现同道</h1>
+          <p className="text-muted-foreground mt-1">
+            基于价值观与兴趣共识，探索志同道合的人
+          </p>
+        </div>
       </div>
+
+      {/* 社区自治引导（核心差异化：治理权，不是配额） */}
+      <GovernanceBanner />
+
+      {/* 防刷提示（仅在真正触发时显示） */}
+      {antiAbuseTriggered && <AntiAbuseNotice />}
 
       <div className="flex flex-col sm:flex-row gap-3">
         <div className="relative flex-1">
@@ -237,7 +283,7 @@ export function DiscoverPage({ userId }: DiscoverPageProps) {
           <CardContent className="py-12 text-center text-muted-foreground">
             <p>暂无匹配用户</p>
             <p className="text-sm mt-2">
-              尝试调整搜索或筛选条件，或完成 Layer 0 名片后获得更多推荐
+              尝试调整搜索或筛选条件，或完善你的名片后获得更多推荐
             </p>
             <Link
               href="/onboarding"
