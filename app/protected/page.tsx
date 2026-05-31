@@ -1,11 +1,10 @@
 import { redirect } from "next/navigation";
 import Link from "next/link";
+import { Suspense } from "react";
 
 import { createClient } from "@/lib/supabase/server";
-import { InfoIcon } from "lucide-react";
-import { FetchDataSteps } from "@/components/tutorial/fetch-data-steps";
-import { Suspense } from "react";
-async function UserDetails() {
+
+async function ProtectedContent() {
   const supabase = await createClient();
   const { data, error } = await supabase.auth.getClaims();
 
@@ -13,53 +12,40 @@ async function UserDetails() {
     redirect("/auth/login");
   }
 
-  const sub = data.claims.sub as string | undefined;
-  if (sub) {
-    const { data: profile } = await supabase
-      .from("profiles")
-      .select("layer0")
-      .eq("id", sub)
-      .single();
+  const sub = data.claims.sub as string;
+  const { data: profile } = await supabase
+    .from("profiles")
+    .select("layer0")
+    .eq("id", sub)
+    .single();
 
-    const layer0 = profile?.layer0 as Record<string, unknown> | null;
-    const hasCompleteLayer0 =
-      layer0 &&
-      typeof layer0.name === "string" &&
-      layer0.name.length > 0 &&
-      Array.isArray(layer0.value_tags) &&
-      layer0.value_tags.length >= 3 &&
-      Array.isArray(layer0.interest_tags) &&
-      layer0.interest_tags.length >= 3 &&
-      typeof layer0.manifesto === "string" &&
-      layer0.manifesto.length >= 20;
+  const layer0 = profile?.layer0 as Record<string, unknown> | null;
+  const hasCompleteLayer0 =
+    layer0 &&
+    typeof layer0.name === "string" &&
+    layer0.name.length > 0 &&
+    Array.isArray(layer0.value_tags) &&
+    layer0.value_tags.length >= 3 &&
+    Array.isArray(layer0.interest_tags) &&
+    layer0.interest_tags.length >= 3 &&
+    typeof layer0.manifesto === "string" &&
+    layer0.manifesto.length >= 20;
 
-    if (!hasCompleteLayer0) {
-      redirect("/onboarding");
-    }
+  if (!hasCompleteLayer0) {
+    redirect("/onboarding");
   }
 
-  return JSON.stringify(data.claims, null, 2);
-}
+  const name = layer0?.name as string;
 
-export default function ProtectedPage() {
   return (
-    <div className="flex-1 w-full flex flex-col gap-12">
-      <div className="w-full">
-        <div className="bg-accent text-sm p-3 px-5 rounded-md text-foreground flex gap-3 items-center">
-          <InfoIcon size="16" strokeWidth={2} />
-          欢迎回来！你的 Layer 0 名片已完成
-        </div>
-      </div>
-      <div className="flex flex-col gap-2 items-start">
-        <h2 className="font-bold text-2xl mb-4">用户信息</h2>
-        <pre className="text-xs font-mono p-3 rounded border max-h-32 overflow-auto">
-          <Suspense>
-            <UserDetails />
-          </Suspense>
-        </pre>
-      </div>
+    <div className="flex flex-col gap-12">
       <div>
-        <h2 className="font-bold text-2xl mb-4">发现同道</h2>
+        <h1 className="text-3xl font-bold mb-2">你好，{name} 👋</h1>
+        <p className="text-muted-foreground">欢迎回来，你的 Layer 0 名片已完成</p>
+      </div>
+
+      <div>
+        <h2 className="font-bold text-xl mb-3">发现同道</h2>
         <p className="text-muted-foreground mb-4">
           基于价值观与兴趣共识，为你推荐可能志同道合的人
         </p>
@@ -70,10 +56,16 @@ export default function ProtectedPage() {
           去发现 →
         </Link>
       </div>
-      <div>
-        <h2 className="font-bold text-2xl mb-4">下一步</h2>
-        <FetchDataSteps />
-      </div>
+    </div>
+  );
+}
+
+export default function ProtectedPage() {
+  return (
+    <div className="flex-1 w-full max-w-2xl mx-auto py-12 px-4">
+      <Suspense fallback={<div className="text-muted-foreground">加载中...</div>}>
+        <ProtectedContent />
+      </Suspense>
     </div>
   );
 }
