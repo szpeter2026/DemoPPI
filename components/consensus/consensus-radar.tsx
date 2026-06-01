@@ -49,7 +49,8 @@ export function ConsensusRadar({
           fillOpacity={0.3}
         />
         <Tooltip
-          formatter={(value: number | undefined) => [`${value ?? 0}%`, "匹配度"]}
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
+          formatter={(value: any) => [`${typeof value === "number" ? value : 0}%`, "匹配度"]}
           contentStyle={{ borderRadius: "8px" }}
         />
       </RadarChart>

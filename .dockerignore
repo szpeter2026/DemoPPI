@@ -1,0 +1,9 @@
+.git
+.gitignore
+.env.local
+.env*.local
+node_modules
+.next
+README.md
+TROUBLESHOOTING.md
+docs/
