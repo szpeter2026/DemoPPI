@@ -1,11 +1,23 @@
--- ============================================
--- DemoPPI — 完整数据库初始化 SQL
--- 在 Supabase SQL Editor 中一次性执行
--- ============================================
+-- ============================================================
+-- DemoPPI — 完整数据库初始化 SQL (v1.0 Final)
+-- 来源：合并 supabase/migrations/ 下 6 个迁移文件
+-- 用途：在 Supabase SQL Editor 中一次性执行即可初始化全部基础设施
+-- 幂等：全部使用 if not exists / or replace / on conflict do nothing
+-- ============================================================
+-- 迁移清单:
+--   ① 20260220000000_initial_schema    → profiles / connections / 标签库
+--   ② 20260220000001_storage_avatars    → avatars bucket + RLS
+--   ③ 20260530000000_invites            → invites 表 + 3 RPC (validate/consume/generate)
+--   ④ 20260531000000_fixes_and_seed     → 种子邀请码 + handle_new_user_invite 触发器
+--   ⑤ 20260531000000_quota_system       → 配额 / 声誉 / 徽章 / 治理 / 5 RPC
+--   ⑥ 20260604000000_trust_fss_records  → Trust FSS 审计表
+-- ============================================================
 
--- ============================================
--- 1. PROFILES 表（扩展 auth.users）
--- ============================================
+-- ============================================================
+-- ██  第一部分：核心 MVP — profiles / connections / 标签库
+-- ============================================================
+
+-- 1.1 PROFILES 表（扩展 auth.users）
 create table if not exists public.profiles (
   id uuid primary key references auth.users(id) on delete cascade,
   username text unique,
@@ -32,27 +44,7 @@ create policy if not exists "Users can update own profile"
   on public.profiles for update
   using (auth.uid() = id);
 
-create or replace function public.handle_new_user()
-returns trigger as $$
-begin
-  insert into public.profiles (id, username)
-  values (
-    new.id,
-    coalesce(new.raw_user_meta_data->>'username', split_part(new.email, '@', 1))
-  )
-  on conflict (id) do nothing;
-  return new;
-end;
-$$ language plpgsql security definer;
-
-drop trigger if exists on_auth_user_created on auth.users;
-create trigger on_auth_user_created
-  after insert on auth.users
-  for each row execute procedure public.handle_new_user();
-
--- ============================================
--- 2. CONNECTIONS 表（关注/连接关系）
--- ============================================
+-- 1.2 CONNECTIONS 表（关注/连接关系）
 create table if not exists public.connections (
   id bigint primary key generated always as identity,
   follower_id uuid not null references auth.users(id) on delete cascade,
@@ -79,9 +71,7 @@ create policy if not exists "Users can delete own connections"
   on public.connections for delete
   using (auth.uid() = follower_id);
 
--- ============================================
--- 3. 价值观标签库（50个）
--- ============================================
+-- 1.3 价值观标签库（50个）
 create table if not exists public.value_tags (
   id text primary key,
   label text not null,
@@ -145,9 +135,7 @@ alter table public.value_tags enable row level security;
 create policy if not exists "Value tags are publicly readable"
   on public.value_tags for select using (true);
 
--- ============================================
--- 4. 兴趣标签库（50个）
--- ============================================
+-- 1.4 兴趣标签库（50个）
 create table if not exists public.interest_tags (
   id text primary key,
   label text not null,
@@ -192,7 +180,7 @@ insert into public.interest_tags (id, label, category, sort_order) values
   ('identity', '去中心化身份', 'web3', 34),
   ('governance', '治理', 'web3', 35),
   ('social_impact', '社会影响', 'social', 36),
-  ('sustainability2', '可持续', 'social', 37),
+  ('sustainability', '可持续', 'social', 37),
   ('mental_health', '心理健康', 'wellness', 38),
   ('productivity', '效率', 'work', 39),
   ('remote_work', '远程工作', 'work', 40),
@@ -212,9 +200,11 @@ alter table public.interest_tags enable row level security;
 create policy if not exists "Interest tags are publicly readable"
   on public.interest_tags for select using (true);
 
--- ============================================
--- 5. INVITES 表（邀请码）
--- ============================================
+-- ============================================================
+-- ██  第二部分：邀请系统 — invites 表 + RPC 函数
+-- ============================================================
+
+-- 2.1 INVITES 表
 create table if not exists public.invites (
   id uuid primary key default gen_random_uuid(),
   code text unique not null,
@@ -238,11 +228,7 @@ create policy if not exists "Users can create own invites"
   on public.invites for insert
   with check (auth.uid() = issuer_id);
 
--- ============================================
--- 6. RPC 函数
--- ============================================
-
--- validate_invite(code)
+-- 2.2 RPC: validate_invite — 校验邀请码是否有效
 create or replace function public.validate_invite(p_code text)
 returns table (valid boolean, issuer_id uuid, expires_at timestamptz)
 language plpgsql security definer as $$
@@ -257,12 +243,12 @@ begin
 end;
 $$;
 
--- consume_invite(code, user_id)
+-- 2.3 RPC: consume_invite — 消耗邀请码
 create or replace function public.consume_invite(p_code text, p_user_id uuid)
 returns boolean
 language plpgsql security definer as $$
 declare
-  v_invite public.invites%rowtype;
+  v_invite invites%rowtype;
 begin
   select * into v_invite from public.invites where code = p_code for update;
   if v_invite.id is null or v_invite.used_by is not null or v_invite.expires_at <= now() then
@@ -273,7 +259,7 @@ begin
 end;
 $$;
 
--- generate_invite(issuer_id)
+-- 2.4 RPC: generate_invite — 生成邀请码
 create or replace function public.generate_invite(p_issuer_id uuid)
 returns text
 language plpgsql security definer as $$
@@ -295,13 +281,60 @@ begin
 end;
 $$;
 
--- ============================================
--- 7. STORAGE: avatars bucket + policies
--- ============================================
+-- 2.5 种子邀请码（开发环境用，上线后删除）
+-- REPLACE_WITH_FIRST_USER_UUID 需替换为 Supabase Auth 中首个用户的 uuid
+-- insert into public.invites (code, issuer_id, expires_at)
+-- values ('DEMO0001', 'REPLACE_WITH_FIRST_USER_UUID'::uuid, now() + interval '30 days')
+-- on conflict (code) do nothing;
+
+-- ============================================================
+-- ██  第三部分：新用户自动处理 — 触发器
+-- ============================================================
+
+-- 3.1 handle_new_user_invite: 注册时自动创建 profile + 消费邀请码（兜底）
+create or replace function public.handle_new_user_invite()
+returns trigger
+language plpgsql
+security definer
+as $$
+declare
+  v_code text;
+begin
+  v_code := (new.raw_user_meta_data->>'invite_code');
+  if v_code is not null and v_code <> '' then
+    begin
+      perform public.consume_invite(v_code, new.id);
+    exception
+      when others then null;
+    end;
+  end if;
+
+  insert into public.profiles (id, username)
+  values (
+    new.id,
+    coalesce(new.raw_user_meta_data->>'username', split_part(new.email, '@', 1))
+  )
+  on conflict (id) do nothing;
+
+  return new;
+end;
+$$;
+
+drop trigger if exists on_auth_user_created on auth.users;
+create trigger on_auth_user_created
+  after insert on auth.users
+  for each row execute procedure public.handle_new_user_invite();
+
+-- ============================================================
+-- ██  第四部分：Storage — avatars bucket + RLS
+-- ============================================================
+
+-- 4.1 创建 avatars bucket（public）
 insert into storage.buckets (id, name, public)
 values ('avatars', 'avatars', true)
 on conflict (id) do nothing;
 
+-- 4.2 Storage RLS 策略
 create policy if not exists "Avatar images are publicly accessible"
   on storage.objects for select
   using (bucket_id = 'avatars');
@@ -320,52 +353,498 @@ create policy if not exists "Users can update own avatar"
     auth.uid()::text = (storage.foldername(name))[1]
   );
 
--- ============================================
--- 8. AUTO-CONSUME INVITE ON SIGNUP
--- 注册时自动消费邀请码（从 user_metadata.invite_code 读取）
--- 作为客户端 RPC 调用的兜底保障
--- ============================================
+-- ============================================================
+-- ██  第五部分：配额系统 — 防刷滥用（非付费墙）
+-- ============================================================
 
-create or replace function public.handle_new_user_invite()
-returns trigger
-language plpgsql
-security definer
+-- 5.1 配额使用记录表
+create table if not exists public.quota_usage (
+  id bigserial primary key,
+  user_id uuid not null references auth.users(id) on delete cascade,
+  resource_type text not null check (resource_type in ('discover', 'view_profile', 'follow', 'search', 'create_proposal', 'vote')),
+  usage_date date not null default current_date,
+  count int not null default 1,
+  created_at timestamptz not null default now(),
+  unique (user_id, resource_type, usage_date)
+);
+
+-- 5.2 配额限制配置
+create table if not exists public.quota_limits (
+  tier text primary key check (tier in ('free', 'basic', 'pro')),
+  discover_daily int not null default 50,
+  view_profile_daily int not null default 100,
+  follow_daily int not null default 30,
+  search_daily int not null default 30,
+  create_proposal_daily int not null default 0,
+  vote_daily int not null default 0,
+  updated_at timestamptz not null default now()
+);
+
+insert into public.quota_limits (tier, discover_daily, view_profile_daily, follow_daily, search_daily, create_proposal_daily, vote_daily)
+values
+  ('free',  50, 100, 30, 30, 0, 0),
+  ('basic', 500, 999999, 200, 200, 3, 20),
+  ('pro',   999999, 999999, 999999, 999999, 10, 999999)
+on conflict (tier) do nothing;
+
+-- 5.3 索引
+create index if not exists idx_quota_usage_user_date on public.quota_usage(user_id, usage_date);
+create index if not exists idx_quota_usage_lookup on public.quota_usage(user_id, resource_type, usage_date);
+
+-- 5.4 RLS
+alter table public.quota_usage enable row level security;
+alter table public.quota_limits enable row level security;
+
+create policy if not exists "quota_usage_select_own" on public.quota_usage
+  for select using (auth.uid() = user_id);
+create policy if not exists "quota_usage_insert_own" on public.quota_usage
+  for insert with check (auth.uid() = user_id);
+create policy if not exists "quota_limits_public_read" on public.quota_limits
+  for select using (true);
+
+-- 5.5 RPC: check_and_consume_quota — 防刷配额检查+扣减
+create or replace function public.check_and_consume_quota(
+  p_user_id uuid,
+  p_resource_type text
+) returns jsonb
+language plpgsql security definer
 as $$
 declare
-  v_code text;
+  v_tier text;
+  v_limit int;
+  v_used int;
+  v_date date := current_date;
 begin
-  -- 从 user_metadata 读取邀请码
-  v_code := (new.raw_user_meta_data->>'invite_code');
+  select tier into v_tier from public.user_tiers where user_id = p_user_id;
+  if v_tier is null then v_tier := 'free'; end if;
 
-  if v_code is not null and v_code <> '' then
-    -- 尝试消费邀请码（失败时静默忽略，不影响注册）
-    begin
-      perform public.consume_invite(v_code, new.id);
-    exception
-      when others then
-        -- 消费失败不阻断注册，仅记录（可后续手动处理）
-        null;
-    end;
+  select case p_resource_type
+    when 'discover' then discover_daily
+    when 'view_profile' then view_profile_daily
+    when 'follow' then follow_daily
+    when 'search' then search_daily
+    when 'create_proposal' then create_proposal_daily
+    when 'vote' then vote_daily
+  end into v_limit
+  from public.quota_limits where tier = v_tier;
+
+  if v_limit is null then v_limit := 50; end if;
+  if v_limit >= 999999 then
+    return jsonb_build_object('allowed', true, 'tier', v_tier, 'remaining', 999999, 'purpose', 'anti_abuse');
   end if;
 
-  -- 继续处理 profiles 插入（原 handle_new_user 逻辑）
-  insert into public.profiles (id, username)
-  values (
-    new.id,
-    coalesce(new.raw_user_meta_data->>'username', split_part(new.email, '@', 1))
-  )
-  on conflict (id) do nothing;
+  select coalesce(sum(count), 0) into v_used
+  from public.quota_usage
+  where user_id = p_user_id and resource_type = p_resource_type and usage_date = v_date;
 
-  return new;
+  if v_used >= v_limit then
+    return jsonb_build_object('allowed', false, 'tier', v_tier, 'limit', v_limit, 'used', v_used, 'remaining', 0, 'purpose', 'anti_abuse');
+  end if;
+
+  insert into public.quota_usage (user_id, resource_type, usage_date, count)
+  values (p_user_id, p_resource_type, v_date, 1)
+  on conflict (user_id, resource_type, usage_date)
+  do update set count = quota_usage.count + 1;
+
+  return jsonb_build_object('allowed', true, 'tier', v_tier, 'limit', v_limit, 'used', v_used + 1, 'remaining', v_limit - v_used - 1, 'purpose', 'anti_abuse');
 end;
 $$;
 
--- 替换原有触发器（如果已存在则先删除）
-drop trigger if exists on_auth_user_created on auth.users;
-create trigger on_auth_user_created
-  after insert on auth.users
-  for each row execute procedure public.handle_new_user_invite();
+-- 5.6 RPC: get_quota_remaining — 查询剩余配额
+create or replace function public.get_quota_remaining(
+  p_user_id uuid,
+  p_resource_type text
+) returns jsonb
+language plpgsql security definer
+as $$
+declare
+  v_tier text;
+  v_limit int;
+  v_used int;
+begin
+  select tier into v_tier from public.user_tiers where user_id = p_user_id;
+  if v_tier is null then v_tier := 'free'; end if;
 
--- ============================================
--- ✅ 完成！
--- ============================================
+  select case p_resource_type
+    when 'discover' then discover_daily
+    when 'view_profile' then view_profile_daily
+    when 'follow' then follow_daily
+    when 'search' then search_daily
+    when 'create_proposal' then create_proposal_daily
+    when 'vote' then vote_daily
+  end into v_limit
+  from public.quota_limits where tier = v_tier;
+
+  if v_limit is null then v_limit := 50; end if;
+  if v_limit >= 999999 then
+    return jsonb_build_object('tier', v_tier, 'limit', 999999, 'used', 0, 'remaining', 999999);
+  end if;
+
+  select coalesce(sum(count), 0) into v_used
+  from public.quota_usage
+  where user_id = p_user_id and resource_type = p_resource_type and usage_date = current_date;
+
+  return jsonb_build_object('tier', v_tier, 'limit', v_limit, 'used', v_used, 'remaining', v_limit - v_used);
+end;
+$$;
+
+-- ============================================================
+-- ██  第六部分：声誉系统 + 徽章（链下 V1，参考 Genzer）
+-- ============================================================
+
+-- 6.1 用户档位表（扩展 user_tiers）
+create table if not exists public.user_tiers (
+  user_id uuid primary key references auth.users(id) on delete cascade,
+  tier text not null default 'free' check (tier in ('free', 'basic', 'pro')),
+  reputation_score int not null default 0,
+  contribution_points int not null default 0,
+  governance_weight numeric(5,2) not null default 0.00
+    generated always as (
+      round(reputation_score * 0.6 + contribution_points * 0.4, 2)
+    ) stored,
+  updated_at timestamptz not null default now()
+);
+
+-- 6.2 声誉事件记录表
+create table if not exists public.reputation_events (
+  id bigserial primary key,
+  user_id uuid not null references auth.users(id) on delete cascade,
+  action_type text not null check (action_type in (
+    'complete_profile', 'receive_follow', 'consensus_match', 'invite_register',
+    'create_content', 'host_activity', 'participate_gov', 'absent', 'report_confirmed'
+  )),
+  points int not null,
+  reference_id text,
+  created_at timestamptz not null default now()
+);
+
+-- 6.3 声誉分值配置
+create table if not exists public.reputation_point_config (
+  action_type text primary key,
+  points int not null,
+  daily_limit int not null default 999999,
+  description text
+);
+
+insert into public.reputation_point_config (action_type, points, daily_limit, description) values
+  ('complete_profile',   50,  1,  '完善名片（一次性）'),
+  ('receive_follow',      5,  50, '被关注'),
+  ('consensus_match',    10,  20, '共识匹配'),
+  ('invite_register',   100,   5, '邀请注册成功'),
+  ('create_content',     20,  10, '创建内容'),
+  ('host_activity',     200,   3, '组织活动'),
+  ('participate_gov',    30,  10, '参与治理投票'),
+  ('absent',            -50,   3, '缺席（扣分）'),
+  ('report_confirmed', -100,   3, '举报核实（扣分）')
+on conflict (action_type) do nothing;
+
+-- 6.4 SBT 勋章表
+create table if not exists public.badges (
+  id bigserial primary key,
+  user_id uuid not null references auth.users(id) on delete cascade,
+  badge_type text not null check (badge_type in ('activity', 'contributor', 'level', 'special')),
+  badge_tier text,
+  metadata jsonb not null default '{}',
+  earned_at timestamptz not null default now(),
+  unique (user_id, badge_type, badge_tier)
+);
+
+-- 6.5 等级徽章阈值表
+create table if not exists public.badge_level_thresholds (
+  level text primary key,
+  min_reputation int not null,
+  label text not null
+);
+
+insert into public.badge_level_thresholds (level, min_reputation, label) values
+  ('lv1',   100,   'Lv1 新人'),
+  ('lv2',   300,   'Lv2 参与者'),
+  ('lv3',   600,   'Lv3 活跃者'),
+  ('lv4',   1000,  'Lv4 贡献者'),
+  ('lv5',   2000,  'Lv5 核心贡献者'),
+  ('lv6',   5000,  'Lv6 社区达人'),
+  ('lv7',   10000, 'Lv7 社区领袖'),
+  ('lv8',   25000, 'Lv8 治理委员'),
+  ('lv9',   50000, 'Lv9 仲裁者'),
+  ('lv10',  100000,'Lv10 创始共识者')
+on conflict (level) do nothing;
+
+-- 6.6 索引
+create index if not exists idx_reputation_events_user on public.reputation_events(user_id, created_at desc);
+create index if not exists idx_badges_user on public.badges(user_id, badge_type);
+
+-- 6.7 RLS
+alter table public.user_tiers enable row level security;
+alter table public.reputation_events enable row level security;
+alter table public.reputation_point_config enable row level security;
+alter table public.badges enable row level security;
+alter table public.badge_level_thresholds enable row level security;
+
+create policy if not exists "user_tiers_select_own" on public.user_tiers
+  for select using (auth.uid() = user_id);
+create policy if not exists "user_tiers_upsert_own" on public.user_tiers
+  for all using (auth.uid() = user_id) with check (auth.uid() = user_id);
+
+create policy if not exists "reputation_events_select_own" on public.reputation_events
+  for select using (auth.uid() = user_id);
+
+create policy if not exists "reputation_config_public_read" on public.reputation_point_config
+  for select using (true);
+
+create policy if not exists "badges_select_all" on public.badges
+  for select using (true);
+
+create policy if not exists "badge_thresholds_public_read" on public.badge_level_thresholds
+  for select using (true);
+
+-- 6.8 RPC: record_reputation_event — 记录声誉事件 + 自动升级徽章
+create or replace function public.record_reputation_event(
+  p_user_id uuid,
+  p_action_type text,
+  p_reference_id text default null
+) returns jsonb
+language plpgsql security definer
+as $$
+declare
+  v_points int;
+  v_daily_limit int;
+  v_today_count int;
+  v_new_score int;
+  v_new_badge_level text;
+begin
+  select points, daily_limit into v_points, v_daily_limit
+  from public.reputation_point_config where action_type = p_action_type;
+
+  if v_points is null then
+    return jsonb_build_object('success', false, 'error', 'unknown_action_type');
+  end if;
+
+  select count(*) into v_today_count
+  from public.reputation_events
+  where user_id = p_user_id
+    and action_type = p_action_type
+    and created_at >= current_date;
+
+  if v_today_count >= v_daily_limit then
+    v_points := v_points / 10;
+  end if;
+
+  insert into public.reputation_events (user_id, action_type, points, reference_id)
+  values (p_user_id, p_action_type, v_points, p_reference_id);
+
+  insert into public.user_tiers (user_id, reputation_score)
+  values (p_user_id, greatest(0, v_points))
+  on conflict (user_id) do update
+  set reputation_score = greatest(0, public.user_tiers.reputation_score + v_points),
+      updated_at = now();
+
+  select reputation_score into v_new_score
+  from public.user_tiers where user_id = p_user_id;
+
+  select level into v_new_badge_level
+  from public.badge_level_thresholds
+  where min_reputation <= v_new_score
+  order by min_reputation desc limit 1;
+
+  if v_new_badge_level is not null then
+    insert into public.badges (user_id, badge_type, badge_tier, metadata)
+    values (p_user_id, 'level', v_new_badge_level, jsonb_build_object('reputation', v_new_score))
+    on conflict (user_id, badge_type, badge_tier) do nothing;
+  end if;
+
+  return jsonb_build_object(
+    'success', true,
+    'points_earned', v_points,
+    'new_reputation', v_new_score,
+    'badge_upgrade', v_new_badge_level,
+    'was_throttled', v_today_count >= v_daily_limit
+  );
+end;
+$$;
+
+-- 6.9 RPC: get_reputation_overview — 查询用户声誉概览
+create or replace function public.get_reputation_overview(
+  p_user_id uuid
+) returns jsonb
+language plpgsql security definer
+as $$
+declare
+  v_score int;
+  v_contribution int;
+  v_gov_weight numeric;
+  v_tier text;
+  v_badges jsonb;
+begin
+  select reputation_score, contribution_points, governance_weight, tier
+  into v_score, v_contribution, v_gov_weight, v_tier
+  from public.user_tiers where user_id = p_user_id;
+
+  if v_score is null then
+    return jsonb_build_object('reputation_score', 0, 'contribution_points', 0, 'governance_weight', 0, 'tier', 'free', 'badges', '[]'::jsonb);
+  end if;
+
+  select coalesce(jsonb_agg(jsonb_build_object(
+    'type', badge_type,
+    'tier', badge_tier,
+    'earned_at', earned_at
+  )), '[]'::jsonb) into v_badges
+  from public.badges where user_id = p_user_id;
+
+  return jsonb_build_object(
+    'reputation_score', v_score,
+    'contribution_points', v_contribution,
+    'governance_weight', v_gov_weight,
+    'tier', v_tier,
+    'badges', v_badges,
+    'can_govern', v_tier in ('basic', 'pro')
+  );
+end;
+$$;
+
+-- ============================================================
+-- ██  第七部分：治理系统 — 提案 + 投票
+-- ============================================================
+
+-- 7.1 治理提案表
+create table if not exists public.governance_proposals (
+  id bigserial primary key,
+  proposer_id uuid not null references auth.users(id) on delete cascade,
+  title text not null,
+  description text not null,
+  proposal_type text not null check (proposal_type in ('feature', 'config_change', 'community_rule', 'funding', 'other')),
+  status text not null default 'voting' check (status in ('voting', 'passed', 'rejected', 'executed', 'cancelled')),
+  voting_ends_at timestamptz not null,
+  execution_data jsonb not null default '{}',
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now()
+);
+
+-- 7.2 治理投票表
+create table if not exists public.governance_votes (
+  id bigserial primary key,
+  proposal_id bigint not null references public.governance_proposals(id) on delete cascade,
+  voter_id uuid not null references auth.users(id) on delete cascade,
+  vote text not null check (vote in ('for', 'against', 'abstain')),
+  weight numeric(5,2) not null default 1.00,
+  created_at timestamptz not null default now(),
+  unique (proposal_id, voter_id)
+);
+
+-- 7.3 索引
+create index if not exists idx_proposals_status on public.governance_proposals(status, created_at desc);
+create index if not exists idx_votes_proposal on public.governance_votes(proposal_id);
+
+-- 7.4 RLS
+alter table public.governance_proposals enable row level security;
+alter table public.governance_votes enable row level security;
+
+create policy if not exists "proposals_select_all" on public.governance_proposals
+  for select using (true);
+create policy if not exists "proposals_insert_paid" on public.governance_proposals
+  for insert with check (
+    auth.uid() = proposer_id
+    and exists (select 1 from public.user_tiers where user_id = auth.uid() and tier in ('basic', 'pro'))
+  );
+create policy if not exists "proposals_update_own" on public.governance_proposals
+  for update using (auth.uid() = proposer_id);
+
+create policy if not exists "votes_select_all" on public.governance_votes
+  for select using (true);
+create policy if not exists "votes_insert_paid" on public.governance_votes
+  for insert with check (
+    auth.uid() = voter_id
+    and exists (select 1 from public.user_tiers where user_id = auth.uid() and tier in ('basic', 'pro'))
+  );
+
+-- 7.5 RPC: cast_governance_vote — 治理投票
+create or replace function public.cast_governance_vote(
+  p_proposal_id bigint,
+  p_voter_id uuid,
+  p_vote text
+) returns jsonb
+language plpgsql security definer
+as $$
+declare
+  v_tier text;
+  v_weight numeric;
+  v_proposal_status text;
+  v_ends_at timestamptz;
+begin
+  select tier into v_tier from public.user_tiers where user_id = p_voter_id;
+  if v_tier not in ('basic', 'pro') then
+    return jsonb_build_object('success', false, 'error', 'governance_requires_paid_tier');
+  end if;
+
+  select status, voting_ends_at into v_proposal_status, v_ends_at
+  from public.governance_proposals where id = p_proposal_id;
+
+  if v_proposal_status is null then
+    return jsonb_build_object('success', false, 'error', 'proposal_not_found');
+  end if;
+  if v_proposal_status != 'voting' then
+    return jsonb_build_object('success', false, 'error', 'proposal_not_in_voting');
+  end if;
+  if now() > v_ends_at then
+    return jsonb_build_object('success', false, 'error', 'voting_ended');
+  end if;
+
+  select governance_weight into v_weight
+  from public.user_tiers where user_id = p_voter_id;
+  if v_weight is null or v_weight = 0 then
+    v_weight := 1.00;
+  end if;
+
+  insert into public.governance_votes (proposal_id, voter_id, vote, weight)
+  values (p_proposal_id, p_voter_id, p_vote, v_weight)
+  on conflict (proposal_id, voter_id)
+  do update set vote = p_vote, weight = v_weight;
+
+  perform public.record_reputation_event(p_voter_id, 'participate_gov', p_proposal_id::text);
+
+  return jsonb_build_object(
+    'success', true,
+    'vote', p_vote,
+    'weight', v_weight,
+    'contribution_earned', 30
+  );
+end;
+$$;
+
+-- ============================================================
+-- ██  第八部分：Trust FSS 0.1 — 可选审计表
+-- ============================================================
+
+create table if not exists public.trust_fss_records (
+  id bigserial primary key,
+  record_id uuid not null unique,
+  subject_kind text not null,
+  subject_id text not null,
+  functional_status text not null check (
+    functional_status in ('normal', 'no_data', 'no_computed', 'functional_test')
+  ),
+  data_set_digest text not null,
+  evidence_refs jsonb not null default '[]',
+  verifier_id text not null,
+  rule_version text not null,
+  detail text,
+  raw_response jsonb not null default '{}',
+  created_at timestamptz not null default now()
+);
+
+create index if not exists idx_trust_fss_records_subject
+  on public.trust_fss_records (subject_kind, subject_id, created_at desc);
+
+alter table public.trust_fss_records enable row level security;
+
+create policy if not exists "trust_fss_records_select_authenticated"
+  on public.trust_fss_records
+  for select
+  to authenticated
+  using (true);
+
+-- ============================================================
+-- ✅ 全部完成！
+-- 下一步：在 Supabase Dashboard → Settings → Auth 中:
+--   - Email provider: ON, Confirm email: OFF（开发阶段）
+--   - 或配置自定义 SMTP 后开启 Confirm email
+-- ============================================================
