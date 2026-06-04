@@ -93,7 +93,7 @@ export async function runTrustFssAbcSelfCheck(
 
   for (const caseId of ["A", "B", "C"] as const) {
     const fx = TRUST_FSS_ABC_FIXTURES[caseId];
-    const out = await verifyProposalEvidence(fx.payload, options);
+    const out = await verifyProposalEvidence(fx.payload as unknown as VerifyProposalRequest, options);
     results.push({
       caseId,
       label: fx.label,

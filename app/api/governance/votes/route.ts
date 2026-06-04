@@ -110,7 +110,7 @@ export async function POST(request: NextRequest) {
       const serviceClient = createServiceRoleClient();
       if (serviceClient) {
         try {
-          await appendTrustFssRecord(gate.verification, serviceClient);
+          await appendTrustFssRecord(gate.verification, serviceClient as any);
         } catch (auditErr) {
           console.warn(
             "[governance/votes] trust_fss_records append failed:",

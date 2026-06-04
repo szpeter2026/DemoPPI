@@ -18,7 +18,7 @@
  */
 export function isMiniProgram(): boolean {
   if (typeof window === 'undefined') return false;
-  return /miniProgram/i.test(navigator.userAgent) || window.__wxjs_environment === 'miniprogram';
+  return /miniProgram/i.test(navigator.userAgent) || (window as any).__wxjs_environment === 'miniprogram';
 }
 
 /**
