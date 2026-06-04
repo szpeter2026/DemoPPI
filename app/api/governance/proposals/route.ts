@@ -13,7 +13,7 @@ import { createClient } from "@/lib/supabase/server";
  *   description: 提案描述
  *   proposal_type: 提案类型（feature/config_change/community_rule/funding/other）
  *   voting_duration_days: 投票持续天数（默认7天）
- *   execution_data?: 提案通过后的自动执行参数
+ *   execution_data?: 提案通过后的自动执行参数（Trust FSS 开启时可含 evidence_refs: [{ kind, id }]）
  */
 export async function GET(request: NextRequest) {
   try {
