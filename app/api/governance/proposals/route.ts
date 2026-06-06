@@ -57,15 +57,16 @@ export async function GET(request: NextRequest) {
     }
 
     // 为每个提案附上投票统计
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const proposalsWithStats = await Promise.all(
-      (data || []).map(async (proposal) => {
+      (data || []).map(async (proposal: Record<string, any>) => {
         const { data: votes } = await supabase
           .from("governance_votes")
           .select("vote, weight")
           .eq("proposal_id", proposal.id);
 
         const stats = (votes || []).reduce(
-          (acc, v) => {
+          (acc: { for_count: number; for_weight: number; against_count: number; against_weight: number; abstain_count: number; total_count: number; total_weight: number }, v: Record<string, unknown>) => {
             if (v.vote === "for") {
               acc.for_count += 1;
               acc.for_weight += Number(v.weight);

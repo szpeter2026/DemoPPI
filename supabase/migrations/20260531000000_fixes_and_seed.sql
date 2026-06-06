@@ -17,20 +17,19 @@
 
 -- ============================================
 -- 2. 种子邀请码（首个管理员用）
--- issuer 使用系统内已存在的 auth.users 记录
+-- 仅在 auth.users 中已有用户时才插入
 -- ============================================
-
--- 生成测试邀请码 DEMO0001（30天有效期）
--- 注意：issuer_id 必须是 auth.users 中真实存在的 uuid
--- 首次部署时，先手动在 Supabase Auth 中创建一个用户，
--- 然后用该用户的 ID 替换下面的 'REPLACE_WITH_FIRST_USER_UUID'
-insert into public.invites (code, issuer_id, expires_at)
-values (
-  'DEMO0001',
-  'REPLACE_WITH_FIRST_USER_UUID'::uuid,
-  now() + interval '30 days'
-)
-on conflict (code) do nothing;
+do $$
+declare
+  first_user_id uuid;
+begin
+  select id into first_user_id from auth.users order by created_at asc limit 1;
+  if found then
+    insert into public.invites (code, issuer_id, expires_at)
+    values ('DEMO0001', first_user_id, now() + interval '30 days')
+    on conflict (code) do nothing;
+  end if;
+end $$;
 
 -- ============================================
 -- 3. 替代方案：环境变量种子码

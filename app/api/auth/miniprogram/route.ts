@@ -47,7 +47,7 @@ export async function POST(request: Request) {
 
     // Step 1: 验证邀请码
     const seedCode = process.env.SEED_INVITE_CODE?.trim().toUpperCase();
-    const isSeedCode = seedCode && invite_code.trim().toUpperCase() === seedCode;
+    const isSeedCode: boolean = !!(seedCode && invite_code.trim().toUpperCase() === seedCode);
 
     if (!isSeedCode) {
       const supabase = await createClient();
@@ -243,19 +243,27 @@ async function handleMockLogin(inviteCode: string, isSeedCode: boolean) {
 
   // 消费邀请码
   if (!isSeedCode) {
-    await supabase.rpc("consume_invite", {
-      p_code: inviteCode.trim().toUpperCase(),
-      p_user_id: signUpData.user.id,
-    }).catch(console.warn);
+    try {
+      await supabase.rpc("consume_invite", {
+        p_code: inviteCode.trim().toUpperCase(),
+        p_user_id: signUpData.user.id,
+      });
+    } catch {
+      console.warn("[Auth/MP-Mock] 消费邀请码失败（非致命）");
+    }
   }
 
   // 记录声誉事件
-  await supabase.rpc("record_reputation_event", {
-    p_user_id: signUpData.user.id,
-    p_event_type: "invite_signup",
-    p_points: 100,
-    p_description: "通过邀请码注册（开发环境）",
-  }).catch(console.warn);
+  try {
+    await supabase.rpc("record_reputation_event", {
+      p_user_id: signUpData.user.id,
+      p_event_type: "invite_signup",
+      p_points: 100,
+      p_description: "通过邀请码注册（开发环境）",
+    });
+  } catch {
+    console.warn("[Auth/MP-Mock] 记录声誉事件失败（非致命）");
+  }
 
   // 获取 session
   const { data: session } = await supabase.auth.getSession();

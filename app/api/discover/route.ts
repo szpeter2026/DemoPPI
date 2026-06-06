@@ -9,6 +9,10 @@ import { calculateConsensusScore } from "@/lib/consensus/calculate";
  */
 export async function GET(request: Request) {
   const supabase = await createClient();
+
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  type ProfileRow = Record<string, any> & { id: string; username: string; layer0: Record<string, unknown>; visibility_settings: Record<string, unknown> };
+  type DiscoverResult = { id: string; username: string; layer0: Record<string, unknown>; consensusScore: number; valueScore: number; interestScore: number; valueOverlap: string[]; interestOverlap: string[] };
   const {
     data: { user },
   } = await supabase.auth.getUser();
@@ -28,8 +32,8 @@ export async function GET(request: Request) {
     ]);
     const s = search.toLowerCase();
     searchTagIds = [
-      ...(vt.data ?? []).filter((t) => t.label.toLowerCase().includes(s)).map((t) => t.id),
-      ...(it.data ?? []).filter((t) => t.label.toLowerCase().includes(s)).map((t) => t.id),
+      ...(vt.data ?? []).filter((t: { id: string; label: string }) => t.label.toLowerCase().includes(s)).map((t: { id: string; label: string }) => t.id),
+      ...(it.data ?? []).filter((t: { id: string; label: string }) => t.label.toLowerCase().includes(s)).map((t: { id: string; label: string }) => t.id),
     ];
   }
 
@@ -58,14 +62,14 @@ export async function GET(request: Request) {
     };
   }
 
-  let results = (profiles ?? [])
+  const filteredProfiles = ((profiles ?? []) as ProfileRow[])
     .filter((p) => p.id !== user?.id)
-    .filter((p) => {
+    .filter((p: ProfileRow) => {
       const vs = (p.visibility_settings as Record<string, unknown>) ?? {};
       if (vs.show_in_discover === false) return false;
       return true;
     })
-    .filter((p) => {
+    .filter((p: ProfileRow) => {
       const layer0 = (p.layer0 as Record<string, unknown>) ?? {};
       const name = (layer0.name as string) ?? "";
       const manifesto = (layer0.manifesto as string) ?? "";
@@ -88,8 +92,10 @@ export async function GET(request: Request) {
       if (valueTag && !vTags.includes(valueTag)) return false;
       if (interestTag && !iTags.includes(interestTag)) return false;
       return true;
-    })
-    .map((p) => {
+    });
+
+  const results: DiscoverResult[] = filteredProfiles
+    .map((p: ProfileRow): DiscoverResult => {
       const layer0 = (p.layer0 as Record<string, unknown>) ?? {};
       const theirValueTags = (layer0.value_tags as string[]) ?? [];
       const theirInterestTags = (layer0.interest_tags as string[]) ?? [];
@@ -111,8 +117,8 @@ export async function GET(request: Request) {
         interestOverlap: consensus.interestOverlap,
       };
     })
-    .filter((r) => r.consensusScore >= minConsensus)
-    .sort((a, b) => b.consensusScore - a.consensusScore)
+    .filter((r: DiscoverResult) => r.consensusScore >= minConsensus)
+    .sort((a: DiscoverResult, b: DiscoverResult) => b.consensusScore - a.consensusScore)
     .slice(0, limit);
 
   return NextResponse.json(results);
