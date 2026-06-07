@@ -39,3 +39,5 @@ miniprogram-export/
 
 # Lock file (generated)
 package-lock.json
+.idea/
+tmp_pkgs/

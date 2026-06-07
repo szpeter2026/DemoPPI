@@ -248,8 +248,8 @@ async function handleMockLogin(inviteCode: string, isSeedCode: boolean) {
         p_code: inviteCode.trim().toUpperCase(),
         p_user_id: signUpData.user.id,
       });
-    } catch (e) {
-      console.warn(e);
+    } catch {
+      console.warn("[Auth/MP-Mock] 消费邀请码失败（非致命）");
     }
   }
 
@@ -261,8 +261,8 @@ async function handleMockLogin(inviteCode: string, isSeedCode: boolean) {
       p_points: 100,
       p_description: "通过邀请码注册（开发环境）",
     });
-  } catch (e) {
-    console.warn(e);
+  } catch {
+    console.warn("[Auth/MP-Mock] 记录声誉事件失败（非致命）");
   }
 
   // 获取 session

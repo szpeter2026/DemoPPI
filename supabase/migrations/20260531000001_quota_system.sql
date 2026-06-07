@@ -12,7 +12,7 @@ create table if not exists public.user_tiers (
   tier text not null default 'free' check (tier in ('free', 'basic', 'pro')),
   reputation_score int not null default 0,
   contribution_points int not null default 0,
-  governance_weight numeric(5,2) not null default 0.00
+  governance_weight numeric(5,2)
     generated always as (
       round(reputation_score * 0.6 + contribution_points * 0.4, 2)
     ) stored,
@@ -228,52 +228,52 @@ alter table public.governance_proposals enable row level security;
 alter table public.governance_votes enable row level security;
 
 -- user_tiers
-create policy if not exists "user_tiers_select_own" on public.user_tiers
+create policy "user_tiers_select_own" on public.user_tiers
   for select using (auth.uid() = user_id);
-create policy if not exists "user_tiers_upsert_own" on public.user_tiers
+create policy "user_tiers_upsert_own" on public.user_tiers
   for all using (auth.uid() = user_id) with check (auth.uid() = user_id);
 
 -- quota_usage
-create policy if not exists "quota_usage_select_own" on public.quota_usage
+create policy "quota_usage_select_own" on public.quota_usage
   for select using (auth.uid() = user_id);
-create policy if not exists "quota_usage_insert_own" on public.quota_usage
+create policy "quota_usage_insert_own" on public.quota_usage
   for insert with check (auth.uid() = user_id);
 
 -- quota_limits: 公开读取
-create policy if not exists "quota_limits_public_read" on public.quota_limits
+create policy "quota_limits_public_read" on public.quota_limits
   for select using (true);
 
 -- reputation_events: 自己可读，系统写入
-create policy if not exists "reputation_events_select_own" on public.reputation_events
+create policy "reputation_events_select_own" on public.reputation_events
   for select using (auth.uid() = user_id);
 
 -- reputation_point_config: 公开读取
-create policy if not exists "reputation_config_public_read" on public.reputation_point_config
+create policy "reputation_config_public_read" on public.reputation_point_config
   for select using (true);
 
 -- badges: 自己可读，所有人可查看他人勋章
-create policy if not exists "badges_select_all" on public.badges
+create policy "badges_select_all" on public.badges
   for select using (true);
 
 -- badge_level_thresholds: 公开读取
-create policy if not exists "badge_thresholds_public_read" on public.badge_level_thresholds
+create policy "badge_thresholds_public_read" on public.badge_level_thresholds
   for select using (true);
 
 -- governance_proposals: 所有人可读，仅付费用户可创建
-create policy if not exists "proposals_select_all" on public.governance_proposals
+create policy "proposals_select_all" on public.governance_proposals
   for select using (true);
-create policy if not exists "proposals_insert_paid" on public.governance_proposals
+create policy "proposals_insert_paid" on public.governance_proposals
   for insert with check (
     auth.uid() = proposer_id
     and exists (select 1 from public.user_tiers where user_id = auth.uid() and tier in ('basic', 'pro'))
   );
-create policy if not exists "proposals_update_own" on public.governance_proposals
+create policy "proposals_update_own" on public.governance_proposals
   for update using (auth.uid() = proposer_id);
 
 -- governance_votes: 所有人可读投票结果，仅付费用户可投票
-create policy if not exists "votes_select_all" on public.governance_votes
+create policy "votes_select_all" on public.governance_votes
   for select using (true);
-create policy if not exists "votes_insert_paid" on public.governance_votes
+create policy "votes_insert_paid" on public.governance_votes
   for insert with check (
     auth.uid() = voter_id
     and exists (select 1 from public.user_tiers where user_id = auth.uid() and tier in ('basic', 'pro'))
