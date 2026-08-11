@@ -8,14 +8,45 @@
 
 ## 1. 产品定位决策
 
-**结论：** PPI 是「共识驱动连接」的 MVP，不是求职工具，不是 DAO 工具。
+**结论：** DemoPPI（genzer）是增长体系中的**「共识增强层 / Activation / Understanding Layer」**，不是主链，不是 DAO 工具，不把 Supabase 升格为主链数据面。
 
-**来源：** `MVP_DECISION.md §1`
+**在增长体系中的位置：**
+
+```
+Layer 0 → PlanetX（裂变/病毒传播）
+           ↑ 增强链路（可选，不阻塞主链）
+           DemoPPI（共识增强层：价值观匹配 → 身份发现 → 裂变转化）
+             ↑ 只读拉取（可选，P2）
+           门户博客（内容 CMS / WP REST）
+```
+
+**核心纪律：**
+- ✅ 增强可选：PlanetX 不依赖 DemoPPI 上线
+- ✅ 不阻塞主链：DemoPPI 回链是企业版增强功能，非 PlanetX SKU
+- ✅ 不占 bolent 主域：DemoPPI 是自己的域名
+- ✅ 不把 Supabase 升格为主链数据面：Supabase 仅用于 DemoPPI 自身共识匹配
+
+**来源：** `MVP_DECISION.md §1` / `GROWTH_PORTAL_NAMING.md §2, §8`
 
 **不做的事：**
-- ❌ 不与 JobFirst / PlanetX 打通（MVP 阶段）
+- ❌ DemoPPI 邀请 ≠ PlanetX 裂变真源（两套独立邀请体系）
+- ❌ 不在 PlanetX 未消费 `?ref=` 前，把门户固定 ref 当成生产归因
+- ❌ 不做 Looma ↔ Supabase SSO（L2 以前）
+- ❌ 不把 Supabase 升格为主链数据面（§8.0 纪律）
 - ❌ 不启动 Consensus Claw（Layer 2 功能）
 - ❌ 不维护 Iamgeek 与 kung-fu 两套后端
+
+**已完成的增长体系适配（2026-08）：**
+
+| 适配项 | 状态 | 说明 |
+|--------|------|------|
+| 环境变量 `NEXT_PUBLIC_PLANETX_URL` | ✅ | `.env.example` 已添加 |
+| 环境变量 `NEXT_PUBLIC_PORTAL_URL` | ✅ | `.env.example` 已添加（可选） |
+| 个人页 PlanetX 回链 | ✅ | `/p/[username]` 页面，「去 PlanetX 裂变」按钮（env-gated） |
+| 个人页门户博客回链 | ✅ | `/p/[username]` 页面，「门户博客」按钮（env-gated） |
+| 首页 PlanetX / 门户入口 | ✅ | `app/page.tsx` Hero 区域（env-gated） |
+| 小程序 PlanetX / 门户配置 | ✅ | `miniprogram/config/index.js` |
+| 个人页只读拉取门户博客 | ⏳ P2 | 待门户 WP REST 就绪 |
 
 ---
 
@@ -134,7 +165,7 @@
 
 1. **停止新建 GitHub 仓库** — 已有仓库够多了
 2. **文档减写、代码多加** — MVP 阶段只维护核心文档
-3. **与 PlanetX 交付线切割** — PPI 是 content 线，不是 JobFirst SKU
+3. **增强可选、不阻塞主链** — DemoPPI 是共识增强层，PlanetX 不依赖 DemoPPI 上线；回链是可选增强
 4. **checklist 与代码同步** — 每完成一项打勾
 
 **来源：** `MVP_DECISION.md §5` / `REPO_LANDSCAPE.md §7`

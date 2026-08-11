@@ -47,6 +47,26 @@ export default function Home() {
           >
             探索社区
           </Link>
+          {process.env.NEXT_PUBLIC_PLANETX_URL && (
+            <a
+              href={process.env.NEXT_PUBLIC_PLANETX_URL}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="bg-gradient-to-r from-purple-600 to-indigo-600 text-white px-6 py-3 rounded-lg font-medium hover:from-purple-700 hover:to-indigo-700 transition"
+            >
+              PlanetX 裂变
+            </a>
+          )}
+          {process.env.NEXT_PUBLIC_PORTAL_URL && (
+            <a
+              href={process.env.NEXT_PUBLIC_PORTAL_URL}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="border border-muted-foreground/20 px-6 py-3 rounded-lg font-medium text-muted-foreground hover:text-foreground hover:border-muted-foreground/40 transition"
+            >
+              门户博客
+            </a>
+          )}
         </div>
       </section>
 

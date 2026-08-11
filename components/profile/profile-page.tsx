@@ -6,7 +6,7 @@ import { Button } from "@/components/ui/button";
 import { ConsensusDetail } from "@/components/consensus/consensus-detail";
 import { FollowButton } from "@/components/follow-button";
 import { ShareCard } from "@/components/share/share-card";
-import { User } from "lucide-react";
+import { User, ExternalLink, Rocket, BookOpen } from "lucide-react";
 import Link from "next/link";
 
 interface ProfilePageProps {
@@ -81,6 +81,10 @@ export function ProfilePage({ profile, currentUserId }: ProfilePageProps) {
   }, []);
 
   const mbtiType = layer0.mbti_type as string;
+
+  // 增长体系回链：PlanetX 裂变 + 门户博客（仅 env 配置时显示）
+  const planetxUrl = process.env.NEXT_PUBLIC_PLANETX_URL;
+  const portalUrl = process.env.NEXT_PUBLIC_PORTAL_URL;
 
   return (
     <div className="max-w-2xl mx-auto space-y-8">
@@ -190,6 +194,36 @@ export function ProfilePage({ profile, currentUserId }: ProfilePageProps) {
             initialFollowing={isFollowing}
             onToggle={(f) => setIsFollowing(f)}
           />
+        </div>
+      )}
+
+      {/* 增长体系回链：PlanetX 裂变 + 门户博客（增强层，可选，不阻塞主链） */}
+      {(planetxUrl || portalUrl) && (
+        <div className="space-y-3">
+          {planetxUrl && (
+            <a
+              href={planetxUrl}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="flex items-center justify-center gap-2 w-full rounded-lg bg-gradient-to-r from-purple-600 to-indigo-600 px-4 py-3 text-white font-medium hover:from-purple-700 hover:to-indigo-700 transition-all shadow-md hover:shadow-lg"
+            >
+              <Rocket className="w-4 h-4" />
+              去 PlanetX 裂变
+              <ExternalLink className="w-3 h-3 opacity-60" />
+            </a>
+          )}
+          {portalUrl && (
+            <a
+              href={portalUrl}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="flex items-center justify-center gap-2 w-full rounded-lg border border-muted-foreground/20 px-4 py-3 text-muted-foreground hover:text-foreground hover:border-muted-foreground/40 hover:bg-muted/50 transition-all"
+            >
+              <BookOpen className="w-4 h-4" />
+              门户博客
+              <ExternalLink className="w-3 h-3 opacity-60" />
+            </a>
+          )}
         </div>
       )}
 
