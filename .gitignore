@@ -39,5 +39,13 @@ miniprogram-export/
 
 # Lock file (generated)
 package-lock.json
+
+# IDE
 .idea/
 tmp_pkgs/
+
+# Runtime data (signal ingest JSONL)
+data/
+
+# Local dev server logs
+demo-dev.*.log
