@@ -29,7 +29,8 @@ create index if not exists idx_trust_fss_records_subject
 alter table public.trust_fss_records enable row level security;
 
 -- 认证用户可读；写入建议走 service role（应用层）
-create policy if not exists "trust_fss_records_select_authenticated"
+drop policy if exists "trust_fss_records_select_authenticated" on public.trust_fss_records;
+create policy "trust_fss_records_select_authenticated"
   on public.trust_fss_records
   for select
   to authenticated
