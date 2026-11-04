@@ -27,6 +27,10 @@ const config = {
   // 种子邀请码（开发环境直接使用，生产环境从后端获取）
   seedInviteCode: isDev ? 'DEMOPPI2026' : '',
 
+  // 增长体系：PlanetX 裂变 + 门户博客
+  planetxUrl: 'https://app.genz.ltd',
+  portalUrl: '',
+
   // 分享默认配置
   shareDefault: {
     title: 'DemoPPI — 找到你的共识圈',

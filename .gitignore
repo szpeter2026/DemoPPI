@@ -42,6 +42,13 @@ package-lock.json
 .idea/
 tmp_pkgs/
 
+
+# Runtime data (signal ingest JSONL)
+data/
+
+# Local dev server logs
+demo-dev.*.log
+
 # ============================================================
 # 商业 / 法务 / 客户文档 —— 一律不入库   [sensitive-doc-guard v1]
 # 本机另有全局规则 ~/.config/git/ignore 兜底；这里再写一份，
