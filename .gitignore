@@ -37,8 +37,7 @@ Thumbs.db
 # Miniprogram export archives (large binaries)
 miniprogram-export/
 
-# Lock file (generated)
-package-lock.json
+# package-lock.json 采用「跟踪」策略：原忽略规则被末尾 !*.json 覆盖（失效），已移除
 .idea/
 tmp_pkgs/
 
